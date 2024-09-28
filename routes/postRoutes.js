@@ -56,12 +56,27 @@ router.post('/', upload.single('image'), protect, async (req, res) => {
 // @route GET /api/posts
 // Get all posts
 router.get('/', async (req, res) => {
+  const page = parseInt(req.query.page) || 1; 
+  const limit = parseInt(req.query.limit) || 9; 
+  const skip = (page - 1) * limit; 
+
   try {
-    const posts = await Post.find().populate('author', 'name').sort({ createdAt: -1 });
-    res.json(posts);
+    const posts = await Post.find()
+      .populate('author', 'name')
+      .sort({ createdAt: -1 })
+      .skip(skip) 
+      .limit(limit); 
+
+    const totalPosts = await Post.countDocuments(); 
+
+    res.json({
+      posts,
+      totalPages: Math.ceil(totalPosts / limit), 
+      currentPage: page,
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching posts' });
-  }
+    res.status(500).json({ message: 'Error fetching posts' });
+  }
 });
 
 // @route GET /api/posts/:id
