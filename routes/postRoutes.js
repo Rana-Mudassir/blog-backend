@@ -2,24 +2,56 @@ const express = require('express');
 const Post = require('../models/Post');
 const { protect } = require('../middleware/authMiddleware');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+
+// Multer configuration for file storage
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, 'uploads/');
+    },
+    filename: (req, file, cb) => {
+      cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+    }
+  });
+  
+  // Initialize multer with storage configuration
+  const upload = multer({
+    storage,
+    limits: { fileSize: 1000000 }, // 1MB limit
+    fileFilter: (req, file, cb) => {
+      const filetypes = /jpeg|jpg|png/;
+      const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = filetypes.test(file.mimetype);
+      if (mimetype && extname) {
+        return cb(null, true);
+      } else {
+        cb('Images only!');
+      }
+    }
+  });
 
 // @route POST /api/posts
 // Create a new post
-router.post('/', protect, async (req, res) => {
-  const { title, content, categories } = req.body;
-  try {
-    const newPost = new Post({
-      title,
-      content,
-      author: req.user._id,
-      categories,
-    });
-    await newPost.save();
-    res.status(201).json(newPost);
-  } catch (error) {
-    res.status(500).json({ message: 'Error creating post' });
-  }
-});
+router.post('/', upload.single('image'), protect, async (req, res) => {
+    try {
+      const { title, content, categories } = req.body;
+      const image = req.file ? `/uploads/${req.file.filename}` : ''; // Store the uploaded image path
+  
+      const newPost = new Post({
+        title,
+        content,
+        categories,
+        image, // Save image path to the post model
+        author: req.user._id // Assuming the user is authenticated
+      });
+  
+      const createdPost = await newPost.save();
+      res.status(201).json(createdPost);
+    } catch (error) {
+      res.status(500).json({ message: 'Error creating post: ' + error.message });
+    }
+  });
 
 // @route GET /api/posts
 // Get all posts
@@ -75,13 +107,13 @@ router.delete('/:id', protect, async (req, res) => {
     const post = await Post.findById(req.params.id);
 
     if (post && post.author.toString() === req.user._id.toString()) {
-      await post.remove();
+        await Post.findByIdAndDelete(req.params.id);
       res.json({ message: 'Post removed' });
     } else {
       res.status(401).json({ message: 'Not authorized' });
     }
   } catch (error) {
-    res.status(500).json({ message: 'Error deleting post' });
+    res.status(500).json({ message: 'Error deleting post, ' + error.message });
   }
 });
 
