@@ -120,7 +120,7 @@ router.delete("/:id", protect, async (req, res) => {
       res.status(401).json({ message: "Not authorized" });
     }
   } catch (error) {
-    res.status(500).json({ message: "Error deleting post, " + error.message });
+    res.status(500).json({ message: "Error deleting post, "});
   }
 });
 
